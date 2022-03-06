@@ -7,12 +7,13 @@ var above = float(na)
 var below = float(na)
 var top = float(na)
 var bottom = float(na)
-var line center = na, var line resistance = na, var line support = na, var line mresistance = na, var line msupport = na
-period = input.int(100, "Period", minval = 5)
-extend = input.string("Right", "Extend", options = ["Right", "None"]) == "Right" ? extend.right : extend.none
-line.delete(center[1]), line.delete(resistance[1]), line.delete(support[1]), line.delete(mresistance[1]), line.delete(msupport[1])
+var line center = na, var line resistance = na, var line support = na, var line subresistance = na, var line subsupport = na, var line stop = na
+factor = input.float(1.2, "Reward Factor", minval = 1)
+period = input.int(200, "Period", minval = 5)
+extend = input.string("Extend", "Lines", options = ["Extend", "None"]) == "Extend" ? extend.right : extend.none
+line.delete(center[1]), line.delete(resistance[1]), line.delete(support[1]), line.delete(subresistance[1]), line.delete(subsupport[1]), line.delete(stop[1])
 
-// direction
+// DIRECTION
 up = open > close and open[1] < close[1]
 down = open < close and open[1] > close[1]
 
@@ -57,24 +58,33 @@ for i = 0 to index
 deviation := math.sqrt(deviation / index) * 2
 point = linreg + slope * index
 
+// RISK & REWARD
+price(value) => value > 10.0 ? str.format("{0,number,#.##}", value) : str.tostring(value)
+atr = ta.atr(14)
+
 // SIGNAL
-signal = barstate.islast and (peak[1] or trough[1]) and (close > linreg + deviation or close < linreg - deviation)
-alertcondition(signal, "Signal", message = "Signal")
-if signal
-    label.new(bar_index, close < linreg ? low - deviation : high + deviation, close < linreg ? "LL" : "HH", style = close < linreg ? label.style_label_up : label.style_label_down, textcolor = color.silver, color = color.black)
+if barstate.islast and (peak[1] or trough[1]) and (close > linreg + deviation or close < linreg - deviation)
+    if close > linreg
+        position = (high[2] > high[1] ? high[2] : high[1]) + atr, risk = position, reward = low - atr * factor
+        stop := line.new(bar_index - 2, position, bar_index + 1, risk, color = color.red, width = 2)
+        alert("Short\nTP " + price(reward) + "\nSL " + price(risk), alert.freq_once_per_bar)
+    else
+        position = (low[2] < low[1] ? low[2] : low[1]) - atr, risk = position, reward = high + atr * factor
+        stop := line.new(bar_index - 2, position, bar_index + 1, risk, color = color.blue, width = 2)
+        alert("Long\nTP " + price(reward) + "\nSL " + price(risk), alert.freq_once_per_bar)
 
 // DRAW
-center      := line.new(bar_index - period + 1, point                , bar_index, linreg                , xloc.bar_index, extend, pearson < 0 ? color.lime : color.aqua, line.style_dotted, 2)
-resistance  := line.new(bar_index - period + 1, point + deviation    , bar_index, linreg + deviation    , xloc.bar_index, extend, color.red , line.style_dashed, 2)
-support     := line.new(bar_index - period + 1, point - deviation    , bar_index, linreg - deviation    , xloc.bar_index, extend, color.blue, line.style_dashed, 2)
-mresistance := line.new(bar_index - period + 1, point + deviation / 2, bar_index, linreg + deviation / 2, xloc.bar_index, extend, color.red , line.style_dotted, 1)
-msupport    := line.new(bar_index - period + 1, point - deviation / 2, bar_index, linreg - deviation / 2, xloc.bar_index, extend, color.blue, line.style_dotted, 1)
+center          := line.new(bar_index - period + 1, point                , bar_index, linreg                , xloc.bar_index, extend, pearson < 0 ? color.lime : color.aqua, line.style_dotted, 2)
+resistance      := line.new(bar_index - period + 1, point + deviation    , bar_index, linreg + deviation    , xloc.bar_index, extend, color.red , line.style_dashed, 2)
+support         := line.new(bar_index - period + 1, point - deviation    , bar_index, linreg - deviation    , xloc.bar_index, extend, color.blue, line.style_dashed, 2)
+subresistance   := line.new(bar_index - period + 1, point + deviation / 2, bar_index, linreg + deviation / 2, xloc.bar_index, extend, color.red , line.style_dotted, 1)
+subsupport      := line.new(bar_index - period + 1, point - deviation / 2, bar_index, linreg - deviation / 2, xloc.bar_index, extend, color.blue, line.style_dotted, 1)
+ribbon = ta.ema(close, 24) > ta.ema(close, 8) ? color.aqua : color.lime
 plotshape(peak, style = shape.xcross, color = color.red, location = location.abovebar, size = size.tiny, title = "Peak")
 plotshape(trough, style = shape.diamond, color = color.blue, location = location.belowbar, size = size.tiny, title = "Trough")
-ribbon = ta.ema(close, 24) > ta.ema(close, 8) ? color.aqua : color.lime
 plot(ta.ema(close,  8), color = color.new(ribbon, 40), title =  "EMA 8")
 plot(ta.ema(close, 12), color = color.new(ribbon, 50), title = "EMA 12")
 plot(ta.ema(close, 16), color = color.new(ribbon, 60), title = "EMA 16")
 plot(ta.ema(close, 20), color = color.new(ribbon, 70), title = "EMA 20")
 plot(ta.ema(close, 24), color = color.new(ribbon, 80), title = "EMA 24")
-fill(plot((open + close) / 2, display = display.none), plot(ta.ema(close, 24), display = display.none), color = color.new(ribbon, 95))
+fill(plot((open + close) / 2, display = display.none), plot(ta.ema(close, 24), display = display.none), color = color.new(ribbon, 96))
